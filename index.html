@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boedjong POS - Coffee Shop</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome 6 CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Pengaturan khusus untuk mencetak struk thermal */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #receiptSection, #receiptSection * {
+                visibility: visible;
+            }
+            #receiptSection {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                display: block !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-amber-50/50 font-sans antialiased text-gray-800 overflow-hidden">
+
+    <!-- Layout Utama: Flexbox 2 Kolom Layar Penuh (100vh) -->
+    <div class="flex h-screen w-screen overflow-hidden">
+        
+        <!-- ================= KOLOM KIRI (2/3): Katalog Menu & Pencarian ================= -->
+        <div class="w-2/3 flex flex-col p-6 overflow-y-auto border-r border-amber-100 bg-amber-50/20">
+            <!-- Header Brand & Pencarian -->
+            <header class="flex justify-between items-center mb-6">
+                <div>
+                    <h1 class="text-2xl font-black text-amber-900 tracking-wide">
+                        <i class="fa-solid fa-mug-saucer text-amber-600 mr-2"></i>BOEDJONG POS
+                    </h1>
+                    <p class="text-xs text-amber-700/70">Coffee Shop Management System</p>
+                </div>
+                <div class="relative w-64">
+                    <input type="text" id="searchProduct" onkeyup="filterProducts()" placeholder="Cari menu kopi/makanan..." class="w-full pl-10 pr-4 py-2 bg-white border border-amber-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm shadow-sm">
+                    <i class="fa-solid fa-search absolute left-3 top-3 text-amber-400"></i>
+                </div>
+            </header>
+
+            <!-- Tombol Filter Kategori -->
+            <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
+                <button onclick="filterCategory('all')" class="category-btn px-4 py-2 bg-amber-800 text-white rounded-xl text-sm font-semibold shadow-sm transition whitespace-nowrap">Semua Menu</button>
+                <button onclick="filterCategory('Kopi')" class="category-btn px-4 py-2 bg-white text-amber-900 border border-amber-200 rounded-xl text-sm font-semibold hover:bg-amber-100 transition whitespace-nowrap">☕ Kopi</button>
+                <button onclick="filterCategory('Non-Kopi')" class="category-btn px-4 py-2 bg-white text-amber-900 border border-amber-200 rounded-xl text-sm font-semibold hover:bg-amber-100 transition whitespace-nowrap">🧋 Non-Kopi</button>
+                <button onclick="filterCategory('Makanan')" class="category-btn px-4 py-2 bg-white text-amber-900 border border-amber-200 rounded-xl text-sm font-semibold hover:bg-amber-100 transition whitespace-nowrap">🥐 Makanan</button>
+            </div>
+
+            <!-- Grid Produk (Dirender Dinamis via JavaScript) -->
+            <div id="productGrid" class="grid grid-cols-3 gap-4 pb-6">
+                <!-- Konten produk dimuat otomatis di sini -->
+            </div>
+        </div>
+
+        <!-- ================= KOLOM KANAN (1/3): Keranjang & Checkout ================= -->
+        <div class="w-1/3 bg-white flex flex-col justify-between p-6 shadow-xl border-l border-amber-100">
+            <div>
+                <!-- Header Keranjang -->
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold text-amber-900 flex items-center gap-2">
+                        <i class="fa-solid fa-receipt text-amber-600"></i> Pesanan Aktif
+                    </h2>
+                    <button onclick="clearCart()" class="text-xs text-red-500 hover:underline font-semibold flex items-center gap-1">
+                        <i class="fa-solid fa-trash-can"></i> Reset
+                    </button>
+                </div>
+                
+                <!-- List Item Keranjang (Scroll Mandiri) -->
+                <div id="cartItems" class="space-y-3 overflow-y-auto max-h-[calc(100vh-360px)] pr-1 divide-y divide-gray-50">
+                    <p class="text-gray-400 text-center py-20 text-sm">Belum ada menu dipilih</p>
+                </div>
+            </div>
+
+            <!-- Billing Engine & Pembayaran -->
+            <div class="border-t border-amber-100 pt-4 mt-2 bg-white">
+                <div class="space-y-1.5 text-sm mb-4">
+                    <div class="flex justify-between text-gray-600">
+                        <span>Subtotal</span>
+                        <span id="subTotal">Rp 0</span>
+                    </div>
+                    <div class="flex justify-between text-gray-600">
+                        <span>Pajak (PB1 10%)</span>
+                        <span id="taxAmount">Rp 0</span>
+                    </div>
+                    <div class="flex justify-between text-base font-bold text-amber-950 pt-2 border-t border-dashed">
+                        <span>Total Akhir</span>
+                        <span id="grandTotal" class="text-amber-700 text-lg">Rp 0</span>
+                    </div>
+                </div>
+
+                <!-- Pilihan Metode Pembayaran -->
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <button onclick="setPayment('Tunai (Cash)')" id="btnCash" class="py-2.5 border-2 border-amber-600 bg-amber-50 text-amber-900 rounded-xl text-xs font-bold transition shadow-sm">💵 Tunai (Cash)</button>
+                    <button onclick="setPayment('QRIS / Transfer')" id="btnQris" class="py-2.5 border-2 border-gray-200 text-gray-600 rounded-xl text-xs font-bold transition shadow-sm">📱 QRIS / Transfer</button>
+                </div>
+
+                <!-- Tombol Checkout -->
+                <button onclick="processCheckout()" class="w-full bg-amber-800 text-white py-3 rounded-xl font-bold hover:bg-amber-900 transition shadow-lg shadow-amber-900/20 text-sm flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-cash-register"></i> Selesaikan Transaksi
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= STRUK CETAK THERMAL (TERSEMBUNYI) ================= -->
+    <div id="receiptSection" class="hidden p-4 max-w-[300px] text-xs font-mono bg-white">
+        <div class="text-center mb-2">
+            <h3 class="font-bold text-sm">BOEDJONG COFFEE SHOP</h3>
+            <p>Jl. Raya Ngopi No. 45, Bandung</p>
+            <p id="receiptDate">-</p>
+        </div>
+        <div class="border-b border-dashed my-2 border-gray-400"></div>
+        <div id="receiptItems" class="space-y-1"></div>
+        <div class="border-b border-dashed my-2 border-gray-400"></div>
+        <div class="flex justify-between"><span>Subtotal:</span><span id="rSub">-</span></div>
+        <div class="flex justify-between"><span>Pajak (10%):</span><span id="rTax">-</span></div>
+        <div class="flex justify-between font-bold"><span>Total:</span><span id="rTotal">-</span></div>
+        <div class="flex justify-between mt-1"><span>Metode:</span><span id="rPaymentType">-</span></div>
+        <div class="border-b border-dashed my-2 border-gray-400"></div>
+        <p class="text-center mt-3 font-semibold">*** TERIMA KASIH ***</p>
+        <p class="text-center text-[10px]">Silakan Datang Kembali</p>
+    </div>
+
+    <!-- ================= JAVASCRIPT LOGIC ================= -->
+    <script>
+        // Mock Data Produk Coffee Shop (Minimal 8 Item)
+        const products = [
+            { id: 1, name: 'Caffe Latte', price: 28000, category: 'Kopi', icon: 'fa-mug-hot', color: 'bg-amber-100 text-amber-700' },
+            { id: 2, name: 'Americano Ice', price: 22000, category: 'Kopi', icon: 'fa-glass-water', color: 'bg-orange-100 text-orange-700' },
+            { id: 3, name: 'Kopi Susu Boedjong', price: 20000, category: 'Kopi', icon: 'fa-coffee', color: 'bg-yellow-100 text-yellow-800' },
+            { id: 4, name: 'Manual Brew V60', price: 30000, category: 'Kopi', icon: 'fa-filter', color: 'bg-stone-200 text-stone-700' },
+            { id: 5, name: 'Matcha Latte', price: 32000, category: 'Non-Kopi', icon: 'fa-leaf', color: 'bg-emerald-100 text-emerald-700' },
+            { id: 6, name: 'Chocolate Regal', price: 28000, category: 'Non-Kopi', icon: 'fa-cup-tassels', color: 'bg-amber-900/10 text-amber-900' },
+            { id: 7, name: 'Croissant Butter', price: 25000, category: 'Makanan', icon: 'fa-croissant', color: 'bg-amber-50 text-amber-600' },
+            { id: 8, name: 'French Fries', price: 18000, category: 'Makanan', icon: 'fa-bowl-food', color: 'bg-yellow-50 text-yellow-600' },
+        ];
+
+        let cart = [];
+        let currentCategory = 'all';
+        let selectedPayment = 'Tunai (Cash)';
+
+        // Jalankan saat halaman pertama kali dimuat
+        window.onload = function() {
+            renderProducts(products);
+        };
+
+        // Fungsi Render Katalog Produk ke Grid
+        function renderProducts(items) {
+            const grid = document.getElementById('productGrid');
+            if (items.length === 0) {
+                grid.innerHTML = `<p class="col-span-3 text-center text-gray-400 py-16 text-sm">Menu tidak ditemukan</p>`;
+                return;
+            }
+            
+            let html = '';
+            items.forEach(p => {
+                html += `
+                    <div onclick="addToCart(${p.id})" class="bg-white p-4 rounded-2xl shadow-sm hover:shadow-md cursor-pointer border border-amber-100 hover:border-amber-400 transition flex flex-col justify-between">
+                        <div class="h-24 ${p.color} rounded-xl flex items-center justify-center mb-3 text-2xl shadow-inner">
+                            <i class="fa-solid ${p.icon}"></i>
+                        </div>
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">${p.category}</span>
+                            <h3 class="font-semibold text-gray-800 text-sm mt-1 truncate">${p.name}</h3>
+                            <p class="text-amber-800 font-bold text-sm mt-0.5">Rp ${p.price.toLocaleString()}</p>
+                        </div>
+                    </div>
+                `;
+            });
+            grid.innerHTML = html;
+        }
+
+        // Fungsi Filter Kategori Cepat
+        function filterCategory(category) {
+            currentCategory = category;
+            
+            // Perbarui warna tombol aktif
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.classList.remove('bg-amber-800', 'text-white');
+                btn.classList.add('bg-white', 'text-amber-900', 'border', 'border-amber-200');
+            });
+            event.target.classList.remove('bg-white', 'text-amber-900', 'border', 'border-amber-200');
+            event.target.classList.add('bg-amber-800', 'text-white');
+
+            applyFilterAndSearch();
+        }
+
+        // Fungsi Pencarian Real-time (onkeyup)
+        function filterProducts() {
+            applyFilterAndSearch();
+        }
+
+        function applyFilterAndSearch() {
+            const keyword = document.getElementById('searchProduct').value.toLowerCase();
+            let filtered = products.filter(p => p.name.toLowerCase().includes(keyword));
+            
+            if (currentCategory !== 'all') {
+                filtered = filtered.filter(p => p.category === currentCategory);
+            }
+            renderProducts(filtered);
+        }
+
+        // Fungsi Tambah Produk ke Keranjang
+        function addToCart(id) {
+            const product = products.find(p => p.id === id);
+            const existing = cart.find(item => item.id === id);
+            if (existing) {
+                existing.qty += 1;
+            } else {
+                cart.push({ ...product, qty: 1 });
+            }
+            updateCartUI();
+        }
+
+        // Fungsi Update Tampilan Keranjang & Billing Engine Otomatis
+        function updateCartUI() {
+            const container = document.getElementById('cartItems');
+            const subTotalElem = document.getElementById('subTotal');
+            const taxElem = document.getElementById('taxAmount');
+            const grandTotalElem = document.getElementById('grandTotal');
+
+            if (cart.length === 0) {
+                container.innerHTML = `<p class="text-gray-400 text-center py-20 text-sm">Belum ada menu dipilih</p>`;
+                subTotalElem.innerText = 'Rp 0';
+                taxElem.innerText = 'Rp 0';
+                grandTotalElem.innerText = 'Rp 0';
+                return;
+            }
+
+            let html = '';
+            let subtotal = 0;
+
+            cart.forEach((item, index) => {
+                subtotal += item.price * item.qty;
+                html += `
+                    <div class="flex justify-between items-center py-2.5">
+                        <div class="w-2/5">
+                            <h4 class="font-semibold text-gray-800 text-xs truncate">${item.name}</h4>
+                            <p class="text-[11px] text-amber-700">Rp ${item.price.toLocaleString()}</p>
+                        </div>
+                        <div class="flex items-center gap-1.5 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
+                            <button onclick="changeQty(${index}, -1)" class="w-5 h-5 bg-white rounded text-xs font-bold text-amber-900 shadow-sm hover:bg-gray-100">-</button>
+                            <span class="text-xs font-bold w-4 text-center">${item.qty}</span>
+                            <button onclick="changeQty(${index}, 1)" class="w-5 h-5 bg-white rounded text-xs font-bold text-amber-900 shadow-sm hover:bg-gray-100">+</button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-gray-800 w-16 text-right">Rp ${(item.price * item.qty).toLocaleString()}</span>
+                            <button onclick="removeItem(${index})" class="text-red-400 hover:text-red-600 text-xs"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Kalkulasi Pajak PB1 10%
+            const tax = subtotal * 0.10;
+            const grandTotal = subtotal + tax;
+
+            container.innerHTML = html;
+            subTotalElem.innerText = `Rp ${subtotal.toLocaleString()}`;
+            taxElem.innerText = `Rp ${tax.toLocaleString()}`;
+            grandTotalElem.innerText = `Rp ${grandTotal.toLocaleString()}`;
+        }
+
+        // Ubah Kuantitas Item di Keranjang
+        function changeQty(index, amount) {
+            cart[index].qty += amount;
+            if (cart[index].qty <= 0) {
+                cart.splice(index, 1);
+            }
+            updateCartUI();
+        }
+
+        // Hapus Item Spesifik dari Keranjang
+        function removeItem(index) {
+            cart.splice(index, 1);
+            updateCartUI();
+        }
+
+        // Kosongkan Seluruh Keranjang (Reset)
+        function clearCart() {
+            cart = [];
+            updateCartUI();
+        }
+
+        // Pilih Metode Pembayaran
+        function setPayment(type) {
+            selectedPayment = type;
+            if (type === 'Tunai (Cash)') {
+                document.getElementById('btnCash').className = 'py-2.5 border-2 border-amber-600 bg-amber-50 text-amber-900 rounded-xl text-xs font-bold transition shadow-sm';
+                document.getElementById('btnQris').className = 'py-2.5 border-2 border-gray-200 text-gray-600 rounded-xl text-xs font-bold transition shadow-sm';
+            } else {
+                document.getElementById('btnQris').className = 'py-2.5 border-2 border-amber-600 bg-amber-50 text-amber-900 rounded-xl text-xs font-bold transition shadow-sm';
+                document.getElementById('btnCash').className = 'py-2.5 border-2 border-gray-200 text-gray-600 rounded-xl text-xs font-bold transition shadow-sm';
+            }
+        }
+
+        // Proses Checkout & Cetak Struk Thermal
+        function processCheckout() {
+            if (cart.length === 0) {
+                alert('Keranjang masih kosong, pilih menu terlebih dahulu!');
+                return;
+            }
+
+            let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            let tax = subtotal * 0.10;
+            let grandTotal = subtotal + tax;
+
+            // Isi Data ke Struk Thermal Tersembunyi
+            document.getElementById('receiptDate').innerText = new Date().toLocaleString('id-ID');
+            let rHtml = '';
+            cart.forEach(i => {
+                rHtml += `<div class="flex justify-between"><span>${i.qty}x ${i.name}</span><span>${(i.price * i.qty).toLocaleString()}</span></div>`;
+            });
+            document.getElementById('receiptItems').innerHTML = rHtml;
+            document.getElementById('rSub').innerText = `Rp ${subtotal.toLocaleString()}`;
+            document.getElementById('rTax').innerText = `Rp ${tax.toLocaleString()}`;
+            document.getElementById('rTotal').innerText = `Rp ${grandTotal.toLocaleString()}`;
+            document.getElementById('rPaymentType').innerText = selectedPayment;
+
+            // Jalankan Perintah Print Browser (Thermal Printer)
+            window.print();
+            
+            // Reset keranjang otomatis setelah cetak selesai
+            clearCart();
+        }
+    </script>
+</body>
+</html>
